@@ -649,9 +649,10 @@ const initialState = {
   ],
 };
 
-let state = structuredClone(initialState);
+let state = cloneData(initialState);
 let tutorialIndex = 0;
 let answeredQuestion = false;
+let selectedAnswer = null;
 
 const el = {
   fiefName: document.querySelector("#fiefName"),
@@ -710,6 +711,10 @@ const el = {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function cloneData(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function signed(value) {
@@ -1000,7 +1005,11 @@ function renderQuestion() {
         disabled: answeredQuestion,
       });
       if (answeredQuestion) {
-        button.classList.add(index === question.correct ? "correct" : "incorrect");
+        if (index === question.correct) {
+          button.classList.add("correct");
+        } else if (index === selectedAnswer) {
+          button.classList.add("incorrect");
+        }
       }
       return button;
     }),
@@ -1160,10 +1169,10 @@ function drawEvent() {
   for (const item of weighted) {
     roll -= item.weight;
     if (roll <= 0) {
-      return structuredClone(item.event);
+      return cloneData(item.event);
     }
   }
-  return structuredClone(weighted[weighted.length - 1].event);
+  return cloneData(weighted[weighted.length - 1].event);
 }
 
 function resolveEvent(choice) {
@@ -1179,6 +1188,7 @@ function answerQuestion(index) {
   if (answeredQuestion) return;
   const question = questions[state.questionIndex];
   answeredQuestion = true;
+  selectedAnswer = index;
   if (index === question.correct) {
     const reward = Math.round(12 * difficulty().rewardScale);
     state.tournamentScore += 1;
@@ -1188,14 +1198,13 @@ function answerQuestion(index) {
     applyEffects({ knowledge: 1 });
     log(`Tournament lesson: ${question.explanation}`);
   }
-  renderQuestion();
-  renderResourceList();
-  renderLog();
+  render();
 }
 
 function nextQuestion() {
   state.questionIndex = (state.questionIndex + 1) % questions.length;
   answeredQuestion = false;
+  selectedAnswer = null;
   renderQuestion();
 }
 
@@ -1340,9 +1349,10 @@ function changeTutorial(delta) {
 
 function resetGame() {
   const difficultyValue = state.difficulty;
-  state = structuredClone(initialState);
+  state = cloneData(initialState);
   state.difficulty = difficultyValue;
   answeredQuestion = false;
+  selectedAnswer = null;
   el.combatResult.textContent = "";
   log("The fief is reset for a new classroom run.");
   render();
