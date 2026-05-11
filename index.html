@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fief Keeper: A Feudalism Classroom Game</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Classroom strategy RPG</p>
+        <h1>Fief Keeper</h1>
+        <p>
+          Guide a medieval village, serve your lord, negotiate with neighbors,
+          and use historical knowledge to win tournament rewards.
+        </p>
+      </div>
+      <div class="hero-card" aria-label="Current fief summary">
+        <label for="fiefName">Name your fief</label>
+        <div class="name-row">
+          <input id="fiefName" maxlength="28" value="Oakbridge" />
+          <button id="renameFief" type="button">Grant Charter</button>
+        </div>
+        <label for="difficultySelect">Difficulty</label>
+        <select id="difficultySelect">
+          <option value="apprentice">Apprentice Steward</option>
+          <option value="balanced" selected>Balanced Manor</option>
+          <option value="hard">Hard Winter</option>
+          <option value="expert">Iron Crown</option>
+        </select>
+        <button id="tutorialButton" class="secondary" type="button">Start Tutorial</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="status-grid" aria-label="Village status">
+        <article class="metric">
+          <span class="tooltip" data-term="Population" tabindex="0">Population</span>
+          <strong id="populationValue">0</strong>
+          <small id="populationTrend">Stable</small>
+        </article>
+        <article class="metric">
+          <span class="tooltip" data-term="Food Surplus" tabindex="0">Food</span>
+          <strong id="foodValue">0</strong>
+          <small>Feeds villagers each turn</small>
+        </article>
+        <article class="metric">
+          <span class="tooltip" data-term="Coin" tabindex="0">Coin</span>
+          <strong id="coinValue">0</strong>
+          <small>Taxes, trade, tournament prizes</small>
+        </article>
+        <article class="metric">
+          <span class="tooltip" data-term="Timber" tabindex="0">Timber</span>
+          <strong id="timberValue">0</strong>
+          <small>Buildings and repairs</small>
+        </article>
+        <article class="metric">
+          <span class="tooltip" data-term="Happiness" tabindex="0">Happiness</span>
+          <strong id="happinessValue">0</strong>
+          <small id="happinessWarning">Watch unrest</small>
+        </article>
+        <article class="metric">
+          <span class="tooltip" data-term="Unrest" tabindex="0">Unrest</span>
+          <strong id="unrestValue">0</strong>
+          <small id="unrestWarning">Low risk</small>
+        </article>
+      </section>
+
+      <section class="dashboard">
+        <article class="panel village-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Turn <span id="turnValue">1</span></p>
+              <h2 id="fiefTitle">Oakbridge</h2>
+            </div>
+            <div class="pill" id="seasonValue">Spring</div>
+          </div>
+          <div class="bars">
+            <div>
+              <span>Prosperity</span>
+              <div class="bar"><i id="prosperityBar"></i></div>
+            </div>
+            <div>
+              <span>Defense</span>
+              <div class="bar"><i id="defenseBar"></i></div>
+            </div>
+            <div>
+              <span>Lord's Favor</span>
+              <div class="bar"><i id="favorBar"></i></div>
+            </div>
+          </div>
+          <p id="villageNarrative" class="narrative"></p>
+          <div class="resource-list" id="resourceList"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Steward actions</p>
+              <h2>Develop the Village</h2>
+            </div>
+            <div class="pill"><span id="actionPointsValue">3</span> AP</div>
+          </div>
+          <div id="actionList" class="action-list"></div>
+          <button id="endTurnButton" class="primary" type="button">End Turn</button>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Vassalage</p>
+              <h2>Feudal Obligations</h2>
+            </div>
+            <span class="tooltip help" data-term="Vassalage" tabindex="0">?</span>
+          </div>
+          <div id="lordStatus"></div>
+          <div class="button-grid">
+            <button id="pledgeButton" type="button">Renew Oath</button>
+            <button id="sendTaxButton" type="button">Send Feudal Dues</button>
+            <button id="requestAidButton" type="button">Request Aid</button>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Other fiefs</p>
+              <h2>Diplomacy</h2>
+            </div>
+            <span class="tooltip help" data-term="Diplomacy" tabindex="0">?</span>
+          </div>
+          <div id="diplomacyList" class="diplomacy-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Disputes</p>
+              <h2>Light Combat</h2>
+            </div>
+            <span class="tooltip help" data-term="Levy" tabindex="0">?</span>
+          </div>
+          <p>
+            Resolve border conflicts with trained levies. Combat is simplified:
+            preparedness, militia, and morale affect the result.
+          </p>
+          <div class="button-grid">
+            <button id="trainButton" type="button">Drill Militia</button>
+            <button id="patrolButton" type="button">Patrol Borders</button>
+            <button id="skirmishButton" type="button">Settle Dispute</button>
+          </div>
+          <div id="combatResult" class="result-box"></div>
+        </article>
+
+        <article class="panel event-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Dynamic events</p>
+              <h2 id="eventTitle">Awaiting Court News</h2>
+            </div>
+            <span class="tooltip help" data-term="Manorialism" tabindex="0">?</span>
+          </div>
+          <p id="eventDescription"></p>
+          <p id="eventHistory" class="history-note"></p>
+          <div id="eventChoices" class="choice-list"></div>
+        </article>
+
+        <article class="panel tournament-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Review game</p>
+              <h2>Medieval Tournament</h2>
+            </div>
+            <div class="pill">Score <span id="tournamentScore">0</span></div>
+          </div>
+          <p>
+            Answer history questions to earn prizes for your fief. Teachers can
+            project this panel for quick checks for understanding.
+          </p>
+          <div id="questionCard" class="question-card"></div>
+          <div id="answerList" class="answer-list"></div>
+          <button id="nextQuestionButton" class="secondary" type="button">Next Question</button>
+        </article>
+
+        <article class="panel glossary-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Learning support</p>
+              <h2>Feudal Glossary</h2>
+            </div>
+          </div>
+          <div id="glossaryList" class="glossary-list"></div>
+        </article>
+
+        <article class="panel log-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Chronicle</p>
+              <h2>Village Record</h2>
+            </div>
+            <button id="resetButton" class="danger" type="button">Reset</button>
+          </div>
+          <ol id="logList" class="log-list"></ol>
+        </article>
+      </section>
+    </main>
+
+    <div id="tooltipBubble" class="tooltip-bubble" role="tooltip"></div>
+
+    <dialog id="tutorialDialog" class="tutorial-dialog">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Steward training</p>
+          <h2 id="tutorialTitle">Welcome to Your Fief</h2>
+        </div>
+        <button id="closeTutorial" class="icon-button" aria-label="Close tutorial" type="button">x</button>
+      </div>
+      <p id="tutorialBody"></p>
+      <div class="tutorial-progress" id="tutorialProgress"></div>
+      <div class="button-grid">
+        <button id="prevTutorial" type="button">Back</button>
+        <button id="nextTutorial" class="primary" type="button">Next</button>
+      </div>
+    </dialog>
+
+    <script src="game.js"></script>
+  </body>
+</html>
