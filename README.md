@@ -7,16 +7,45 @@ fiefs, and answer review questions in a medieval tournament.
 
 ## Run locally
 
-No installation is required.
+No installation is required for solo practice.
 
 1. Open `index.html` in a browser.
 2. Optional: serve the directory with any static file server, for example:
    `python3 -m http.server 8000`, then visit `http://localhost:8000`.
 
+## Run multiplayer classroom mode
+
+For persistent team saves, generated team codes, and multiple classroom worlds,
+run the included no-dependency Node server:
+
+```sh
+npm start
+```
+
+Then open `http://localhost:3000`.
+
+Default teacher login:
+
+- Username: `teacher`
+- Password: `fiefkeeper`
+
+For classroom use, set your own credentials before starting the server:
+
+```sh
+TEACHER_USERNAME=yourname TEACHER_PASSWORD=yourpassword npm start
+```
+
+Student teams do not create accounts and do not use Google sign-in. The teacher
+creates a world, shares generated team codes, and each team logs in with only
+its code. Saves are written to `data/fiefkeeper-save.json`, which is ignored by
+git so classroom data is not committed.
+
 ## Included systems
 
 - Turn-based resource management with food, coin, timber, prosperity, defense,
   population, happiness, unrest, and steward XP.
+- Multiplayer classroom mode with multiple worlds, generated student team
+  codes, and persistent JSON-backed saves.
 - Feudal system mechanics: vassalage, oaths, feudal dues, lord favor, and aid
   requests.
 - Diplomacy with neighboring fiefs through trade envoys, alliances, and
@@ -35,6 +64,8 @@ No installation is required.
 - A guided tutorial explaining the main classroom mechanics.
 - A tournament-themed review game with historically accurate multiple-choice
   questions that reward correct answers with in-game resources.
+- Two built-in maps: a local fief map showing village features and a world map
+  showing the player's fief in relation to other teams' fiefs.
 
 ## Classroom use
 

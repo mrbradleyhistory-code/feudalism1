@@ -579,6 +579,11 @@ const tutorialSteps = [
       "You are the steward of a medieval fief. Your job is to keep villagers fed, maintain loyalty to a higher lord, and build prosperity without causing rebellion.",
   },
   {
+    title: "Classroom Worlds",
+    body:
+      "Teachers can create multiple worlds and give each team a generated code. Teams enter only that code, so students do not need Google accounts, names, or email addresses.",
+  },
+  {
     title: "Resources and Population",
     body:
       "Food, coin, and timber are spent on actions. Population grows when the village is safe and well fed, but hunger, plague, and combat can reduce it.",
@@ -592,6 +597,11 @@ const tutorialSteps = [
     title: "Feudal Obligations",
     body:
       "You are a vassal of Countess Matilda. Renewing oaths, sending dues, or requesting aid changes your lord's favor. Ignoring obligations can create penalties.",
+  },
+  {
+    title: "Maps",
+    body:
+      "The fief map shows your local manor, fields, roads, commons, and defenses. The world map shows your team fief in relation to other teams in the same classroom world.",
   },
   {
     title: "Happiness and Unrest",
@@ -653,12 +663,38 @@ let state = cloneData(initialState);
 let tutorialIndex = 0;
 let answeredQuestion = false;
 let selectedAnswer = null;
+let saveTimer = null;
+
+const classroom = {
+  apiAvailable: false,
+  mode: "local",
+  teacherToken: null,
+  teacherWorlds: [],
+  teamCode: null,
+  teamId: null,
+  worldId: null,
+  worldName: "Solo Practice",
+  worldTeams: [],
+  saveStatus: "Solo practice is saved in this browser.",
+};
 
 const el = {
   fiefName: document.querySelector("#fiefName"),
   renameFief: document.querySelector("#renameFief"),
   difficultySelect: document.querySelector("#difficultySelect"),
   tutorialButton: document.querySelector("#tutorialButton"),
+  sessionMode: document.querySelector("#sessionMode"),
+  sessionStatus: document.querySelector("#sessionStatus"),
+  teamLoginForm: document.querySelector("#teamLoginForm"),
+  teamCodeInput: document.querySelector("#teamCodeInput"),
+  teacherLoginForm: document.querySelector("#teacherLoginForm"),
+  teacherUsername: document.querySelector("#teacherUsername"),
+  teacherPassword: document.querySelector("#teacherPassword"),
+  createWorldForm: document.querySelector("#createWorldForm"),
+  worldNameInput: document.querySelector("#worldNameInput"),
+  worldDifficultySelect: document.querySelector("#worldDifficultySelect"),
+  teamCountInput: document.querySelector("#teamCountInput"),
+  teacherWorldList: document.querySelector("#teacherWorldList"),
   populationValue: document.querySelector("#populationValue"),
   populationTrend: document.querySelector("#populationTrend"),
   foodValue: document.querySelector("#foodValue"),
@@ -676,6 +712,11 @@ const el = {
   favorBar: document.querySelector("#favorBar"),
   villageNarrative: document.querySelector("#villageNarrative"),
   resourceList: document.querySelector("#resourceList"),
+  fiefMap: document.querySelector("#fiefMap"),
+  fiefMapCaption: document.querySelector("#fiefMapCaption"),
+  worldMap: document.querySelector("#worldMap"),
+  worldMapLegend: document.querySelector("#worldMapLegend"),
+  refreshWorldButton: document.querySelector("#refreshWorldButton"),
   actionPointsValue: document.querySelector("#actionPointsValue"),
   actionList: document.querySelector("#actionList"),
   endTurnButton: document.querySelector("#endTurnButton"),
@@ -715,6 +756,85 @@ function clamp(value, min, max) {
 
 function cloneData(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function storageGet(key) {
+  try {
+    if (!window.localStorage) return null;
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function storageSet(key, value) {
+  try {
+    if (!window.localStorage) return;
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Browser storage may be unavailable in private or locked-down modes.
+  }
+}
+
+function storageRemove(key) {
+  try {
+    if (!window.localStorage) return;
+    window.localStorage.removeItem(key);
+  } catch {
+    // Browser storage may be unavailable in private or locked-down modes.
+  }
+}
+
+async function apiRequest(path, options = {}) {
+  if (typeof fetch !== "function") {
+    throw new Error("The multiplayer server is not available in this browser context.");
+  }
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+  if (classroom.teacherToken) {
+    headers.Authorization = `Bearer ${classroom.teacherToken}`;
+  }
+  const response = await fetch(path, {
+    ...options,
+    headers,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "The classroom server returned an error.");
+  }
+  return payload;
+}
+
+function setSessionStatus(message) {
+  classroom.saveStatus = message;
+  if (el.sessionStatus) {
+    el.sessionStatus.textContent = message;
+  }
+}
+
+function hydrateState(savedState) {
+  const next = {
+    ...cloneData(initialState),
+    ...(savedState || {}),
+  };
+  next.lord = {
+    ...cloneData(initialState.lord),
+    ...(savedState?.lord || {}),
+  };
+  next.neighbors = Array.isArray(savedState?.neighbors)
+    ? savedState.neighbors
+    : cloneData(initialState.neighbors);
+  next.log = Array.isArray(savedState?.log) && savedState.log.length
+    ? savedState.log
+    : cloneData(initialState.log);
+  return next;
+}
+
+function exportState() {
+  normalizeState();
+  return cloneData(state);
 }
 
 function signed(value) {
@@ -851,6 +971,9 @@ function render() {
   renderQuestion();
   renderGlossary();
   renderLog();
+  renderClassroom();
+  renderFiefMap();
+  renderWorldMap();
 }
 
 function populationTrendText() {
@@ -1036,6 +1159,363 @@ function renderLog() {
   );
 }
 
+function renderClassroom() {
+  if (!el.sessionMode) return;
+  const modeLabel = classroom.mode === "teacher"
+    ? "Teacher"
+    : classroom.mode === "team"
+      ? "Team World"
+      : "Solo Practice";
+  el.sessionMode.textContent = modeLabel;
+  el.sessionStatus.textContent = classroom.saveStatus;
+  if (typeof document.querySelectorAll === "function") {
+    document.querySelectorAll(".teacher-tools").forEach((node) => {
+      node.hidden = classroom.mode !== "teacher";
+    });
+  }
+  renderTeacherWorlds();
+}
+
+function renderTeacherWorlds() {
+  if (!el.teacherWorldList || classroom.mode !== "teacher") return;
+  if (!classroom.teacherWorlds.length) {
+    el.teacherWorldList.innerHTML = `
+      <div class="world-card">
+        <strong>No worlds yet.</strong>
+        <small>Create a world to generate anonymous team codes.</small>
+      </div>
+    `;
+    return;
+  }
+  el.teacherWorldList.replaceChildren(
+    ...classroom.teacherWorlds.map((world) => {
+      const card = document.createElement("div");
+      card.className = "world-card";
+      const codes = world.teams
+        .map((team) => `<span class="team-code">${team.name}: ${team.code}</span>`)
+        .join("");
+      card.innerHTML = `
+        <h3>${world.name}</h3>
+        <small>${world.teamCount} teams | ${difficultySettings[world.difficulty]?.label || world.difficulty}</small>
+        <div class="code-list">${codes}</div>
+      `;
+      return card;
+    }),
+  );
+}
+
+function renderFiefMap() {
+  if (!el.fiefMap) return;
+  const tiles = [
+    ["Woods", state.timber > 65 ? "good" : ""],
+    ["Common Pasture", state.happiness > 65 ? "good" : ""],
+    ["Open Fields", state.food > 110 ? "good" : ""],
+    ["Mill", state.prosperity > 45 ? "good" : ""],
+    ["River Ford", ""],
+    ["Cottages", state.population > 100 ? "good" : ""],
+    ["Village Green", state.unrest < 25 ? "good" : ""],
+    ["Manor Hall", "strong"],
+    ["Parish Chapel", state.piety > 18 ? "good" : ""],
+    ["Market Stalls", state.coin > 90 ? "good" : ""],
+    ["Hay Meadow", ""],
+    ["Reeve's Court", state.knowledge > 16 ? "good" : ""],
+    ["Granary", state.food > 140 ? "good" : ""],
+    ["Smithy", state.defense > 45 ? "good" : ""],
+    ["Bridge Toll", ""],
+    ["Fallow Field", ""],
+    ["Orchard", state.happiness > 70 ? "good" : ""],
+    ["Well", ""],
+    ["Palisade", state.defense > 35 ? "strong" : ""],
+    ["Watch Post", state.militia > 10 ? "strong" : ""],
+    ["Tenant Strips", ""],
+    ["Sheepfold", ""],
+    ["Woodlot", state.timber > 90 ? "good" : ""],
+    ["Road to Market", state.reputation > 20 ? "good" : ""],
+    ["Border Stone", state.unrest > 55 ? "strong" : ""],
+  ];
+  el.fiefMap.replaceChildren(
+    ...tiles.map(([label, className]) => {
+      const tile = document.createElement("div");
+      tile.className = `map-tile ${className}`.trim();
+      tile.textContent = label;
+      return tile;
+    }),
+  );
+  el.fiefMapCaption.textContent =
+    "The local map highlights how choices change the manor: stronger defenses, better stores, happier commons, and more productive fields stand out over time.";
+}
+
+function worldTeamsForMap() {
+  if (classroom.worldTeams.length) {
+    return classroom.worldTeams;
+  }
+  return [
+    {
+      id: "local",
+      name: state.fiefName,
+      color: "#8d2e24",
+      position: { x: 48, y: 52 },
+      summary: {
+        turn: state.turn,
+        population: state.population,
+        prosperity: state.prosperity,
+        defense: state.defense,
+        happiness: state.happiness,
+        unrest: state.unrest,
+      },
+    },
+    ...state.neighbors.map((neighbor, index) => ({
+      id: `neighbor-${index}`,
+      name: neighbor.name,
+      color: ["#355c7d", "#356b42", "#9b6b24"][index % 3],
+      position: [
+        { x: 22, y: 30 },
+        { x: 76, y: 36 },
+        { x: 62, y: 76 },
+      ][index],
+      summary: {
+        turn: state.turn,
+        population: 70 + index * 12,
+        prosperity: neighbor.trust,
+        defense: 25 + index * 8,
+        happiness: neighbor.trust,
+        unrest: 100 - neighbor.trust,
+      },
+    })),
+  ];
+}
+
+function renderWorldMap() {
+  if (!el.worldMap || !el.worldMapLegend) return;
+  const teams = worldTeamsForMap();
+  el.worldMap.replaceChildren();
+  teams.slice(1).forEach((team) => {
+    const road = document.createElement("span");
+    road.className = "world-road";
+    const dx = team.position.x - teams[0].position.x;
+    const dy = team.position.y - teams[0].position.y;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    road.style.left = `${teams[0].position.x}%`;
+    road.style.top = `${teams[0].position.y}%`;
+    road.style.width = `${length}%`;
+    road.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+    el.worldMap.append(road);
+  });
+  teams.forEach((team) => {
+    const marker = document.createElement("button");
+    marker.type = "button";
+    marker.className = `map-marker ${team.id === classroom.teamId || team.id === "local" ? "current" : ""}`;
+    marker.style.left = `${team.position.x}%`;
+    marker.style.top = `${team.position.y}%`;
+    marker.style.background = team.color;
+    marker.textContent = team.name.slice(0, 2).toUpperCase();
+    marker.title = `${team.name}: Turn ${team.summary?.turn || 1}, prosperity ${team.summary?.prosperity || 0}, unrest ${team.summary?.unrest || 0}`;
+    el.worldMap.append(marker);
+  });
+  el.worldMapLegend.replaceChildren(
+    ...teams.map((team) => {
+      const item = document.createElement("div");
+      item.innerHTML = `
+        <strong>${team.name}</strong><br>
+        <small>Turn ${team.summary?.turn || 1} | Pop. ${team.summary?.population || 0} | Prosperity ${team.summary?.prosperity || 0} | Unrest ${team.summary?.unrest || 0}</small>
+      `;
+      return item;
+    }),
+  );
+}
+
+function afterStateChange() {
+  render();
+  scheduleSave();
+}
+
+function saveLocalPractice() {
+  storageSet("fiefKeeper.localState", JSON.stringify(exportState()));
+}
+
+function scheduleSave() {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+  }
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    saveGame();
+  }, 250);
+}
+
+async function saveGame() {
+  if (classroom.mode !== "team" || !classroom.teamCode || !classroom.apiAvailable) {
+    saveLocalPractice();
+    setSessionStatus("Solo practice saved in this browser.");
+    return;
+  }
+  try {
+    const payload = await apiRequest("/api/team/save", {
+      method: "POST",
+      body: JSON.stringify({
+        code: classroom.teamCode,
+        state: exportState(),
+      }),
+    });
+    classroom.worldTeams = payload.world.teams;
+    setSessionStatus(`Saved ${state.fiefName} in ${classroom.worldName} at ${new Date(payload.savedAt).toLocaleTimeString()}.`);
+    renderWorldMap();
+  } catch (err) {
+    saveLocalPractice();
+    setSessionStatus(`Server save failed; browser backup saved. ${err.message}`);
+  }
+}
+
+function loadLocalPractice() {
+  const raw = storageGet("fiefKeeper.localState");
+  if (!raw) return;
+  try {
+    state = hydrateState(JSON.parse(raw));
+    classroom.saveStatus = "Loaded solo practice from this browser.";
+  } catch {
+    storageRemove("fiefKeeper.localState");
+  }
+}
+
+async function detectServer() {
+  try {
+    const status = await apiRequest("/api/status");
+    classroom.apiAvailable = true;
+    el.teacherUsername.value = status.teacherUsername || "teacher";
+    setSessionStatus("Classroom server connected. Students can enter generated team codes.");
+  } catch {
+    classroom.apiAvailable = false;
+    setSessionStatus("Solo practice mode. Start `node server.js` to enable shared worlds and persistent team saves.");
+  }
+  renderClassroom();
+}
+
+async function teacherLogin(event) {
+  event.preventDefault();
+  try {
+    const payload = await apiRequest("/api/teacher/login", {
+      method: "POST",
+      body: JSON.stringify({
+        username: el.teacherUsername.value.trim(),
+        password: el.teacherPassword.value,
+      }),
+    });
+    classroom.mode = "teacher";
+    classroom.teacherToken = payload.token;
+    classroom.teamCode = null;
+    classroom.teamId = null;
+    classroom.worldTeams = [];
+    storageRemove("fiefKeeper.teamSession");
+    setSessionStatus("Teacher tools unlocked. Create worlds to generate anonymous team codes.");
+    await loadTeacherWorlds();
+  } catch (err) {
+    setSessionStatus(err.message);
+  }
+  render();
+}
+
+async function loadTeacherWorlds() {
+  if (!classroom.teacherToken) return;
+  const payload = await apiRequest("/api/teacher/worlds");
+  classroom.teacherWorlds = payload.worlds;
+  renderTeacherWorlds();
+}
+
+async function createWorld(event) {
+  event.preventDefault();
+  try {
+    const payload = await apiRequest("/api/teacher/worlds", {
+      method: "POST",
+      body: JSON.stringify({
+        name: el.worldNameInput.value,
+        difficulty: el.worldDifficultySelect.value,
+        teamCount: el.teamCountInput.value,
+      }),
+    });
+    classroom.teacherWorlds.unshift(payload.world);
+    classroom.worldTeams = payload.world.teams;
+    classroom.worldName = payload.world.name;
+    setSessionStatus(`Created ${payload.world.name}. Share the generated team codes with groups.`);
+    render();
+  } catch (err) {
+    setSessionStatus(err.message);
+  }
+}
+
+async function teamLogin(event) {
+  event.preventDefault();
+  const code = el.teamCodeInput.value.trim().toUpperCase();
+  if (!code) {
+    setSessionStatus("Enter a generated team code.");
+    return;
+  }
+  try {
+    const payload = await apiRequest("/api/team/login", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
+    applyTeamSession(payload);
+    storageSet("fiefKeeper.teamSession", JSON.stringify({ code }));
+    setSessionStatus(`Entered ${classroom.worldName} as ${state.fiefName}. Team saves are persistent on the server.`);
+    render();
+    scheduleSave();
+  } catch (err) {
+    setSessionStatus(err.message);
+  }
+}
+
+function applyTeamSession(payload) {
+  classroom.mode = "team";
+  classroom.teamCode = payload.team.code;
+  classroom.teamId = payload.team.id;
+  classroom.worldId = payload.world.id;
+  classroom.worldName = payload.world.name;
+  classroom.worldTeams = payload.world.teams;
+  classroom.teacherToken = null;
+  state = payload.team.state ? hydrateState(payload.team.state) : hydrateState({
+    fiefName: payload.team.name,
+    difficulty: payload.world.difficulty,
+    log: [`You enter ${payload.world.name} with team code ${payload.team.code}.`],
+  });
+  state.fiefName = payload.team.name;
+  state.difficulty = state.difficulty || payload.world.difficulty;
+  answeredQuestion = false;
+  selectedAnswer = null;
+}
+
+async function restoreTeamSession() {
+  const raw = storageGet("fiefKeeper.teamSession");
+  if (!raw || !classroom.apiAvailable) return;
+  try {
+    const session = JSON.parse(raw);
+    const payload = await apiRequest("/api/team/login", {
+      method: "POST",
+      body: JSON.stringify({ code: session.code }),
+    });
+    applyTeamSession(payload);
+    setSessionStatus(`Restored ${state.fiefName} in ${classroom.worldName}.`);
+    render();
+  } catch {
+    storageRemove("fiefKeeper.teamSession");
+  }
+}
+
+async function refreshWorld() {
+  if (classroom.mode !== "team" || !classroom.teamCode || !classroom.apiAvailable) {
+    setSessionStatus("World map refresh is available after entering a team code on the classroom server.");
+    renderWorldMap();
+    return;
+  }
+  try {
+    const payload = await apiRequest(`/api/team/world?code=${encodeURIComponent(classroom.teamCode)}`);
+    classroom.worldTeams = payload.world.teams;
+    setSessionStatus(`Refreshed ${payload.world.name}.`);
+    renderWorldMap();
+  } catch (err) {
+    setSessionStatus(err.message);
+  }
+}
+
 function useAction(id) {
   const action = actions.find((item) => item.id === id);
   if (!action || state.actionPoints < action.ap || !payCost(action.cost)) {
@@ -1044,7 +1524,7 @@ function useAction(id) {
   state.actionPoints -= action.ap;
   applyEffects(action.effects);
   log(`${action.title}: ${action.lesson}`);
-  render();
+  afterStateChange();
 }
 
 function renewOath() {
@@ -1052,7 +1532,7 @@ function renewOath() {
   state.actionPoints -= 1;
   applyEffects({ favor: 8, reputation: 2, unrest: -1, xp: 4 });
   log("You renew your oath of loyalty and receive public recognition from your lord.");
-  render();
+  afterStateChange();
 }
 
 function sendDues() {
@@ -1062,7 +1542,7 @@ function sendDues() {
   state.lord.duesDue = 0;
   applyEffects({ favor: 12, reputation: 2 });
   log(`You send ${paid} coin in feudal dues to your lord.`);
-  render();
+  afterStateChange();
 }
 
 function requestAid() {
@@ -1070,7 +1550,7 @@ function requestAid() {
   state.lord.aidCooldown = 4;
   applyEffects({ food: 24, timber: 12, favor: -12, happiness: 3 });
   log("Your lord sends emergency aid, expecting future loyalty in return.");
-  render();
+  afterStateChange();
 }
 
 function diplomacyAction(index, type) {
@@ -1103,7 +1583,7 @@ function diplomacyAction(index, type) {
     log(`You mediate a boundary disagreement with ${neighbor.name}.`);
   }
 
-  render();
+  afterStateChange();
 }
 
 function trainMilitia() {
@@ -1112,7 +1592,7 @@ function trainMilitia() {
   applyEffects({ militia: 2, defense: 5, happiness: -1, xp: 4 });
   el.combatResult.textContent = "The levy drills with spears and shields. Defense improves.";
   log("Militia training raises preparedness, though farmers grumble about time away from fields.");
-  render();
+  afterStateChange();
 }
 
 function patrolBorders() {
@@ -1128,7 +1608,7 @@ function patrolBorders() {
     el.combatResult.textContent = "A patrol gets lost in bad weather; one levy member returns injured.";
     log("A difficult patrol reminds villagers that local warfare was risky.");
   }
-  render();
+  afterStateChange();
 }
 
 function settleDispute() {
@@ -1150,7 +1630,7 @@ function settleDispute() {
       `The dispute with ${weakestNeighbor.name} goes badly and villagers question your judgment.`;
     log(`A failed border skirmish with ${weakestNeighbor.name} raises unrest.`);
   }
-  render();
+  afterStateChange();
 }
 
 function drawEvent() {
@@ -1181,7 +1661,7 @@ function resolveEvent(choice) {
   log(`${state.event.title}: ${choice.result}`);
   state.eventResolved = true;
   state.event = null;
-  render();
+  afterStateChange();
 }
 
 function answerQuestion(index) {
@@ -1198,20 +1678,20 @@ function answerQuestion(index) {
     applyEffects({ knowledge: 1 });
     log(`Tournament lesson: ${question.explanation}`);
   }
-  render();
+  afterStateChange();
 }
 
 function nextQuestion() {
   state.questionIndex = (state.questionIndex + 1) % questions.length;
   answeredQuestion = false;
   selectedAnswer = null;
-  renderQuestion();
+  afterStateChange();
 }
 
 function endTurn() {
   if (state.event && !state.eventResolved) {
     log("The court waits for your decision on the current event before time can move on.");
-    render();
+    afterStateChange();
     return;
   }
 
@@ -1269,7 +1749,7 @@ function endTurn() {
   state.event = drawEvent();
   state.eventResolved = false;
   log(`${season} ends. Produced ${foodProduced} food, ${coinProduced} coin, and ${timberProduced} timber; consumed ${foodNeeded} food.`);
-  render();
+  afterStateChange();
 }
 
 function checkRebellion() {
@@ -1355,7 +1835,7 @@ function resetGame() {
   selectedAnswer = null;
   el.combatResult.textContent = "";
   log("The fief is reset for a new classroom run.");
-  render();
+  afterStateChange();
 }
 
 function renameFief() {
@@ -1363,16 +1843,20 @@ function renameFief() {
   if (!name) return;
   state.fiefName = name;
   log(`The charter now names the fief ${name}.`);
-  render();
+  afterStateChange();
 }
 
 function changeDifficulty() {
   state.difficulty = el.difficultySelect.value;
   log(`Difficulty set to ${difficulty().label}. Scaling changes future food pressure, events, and rewards.`);
-  render();
+  afterStateChange();
 }
 
 function bindEvents() {
+  el.teamLoginForm.addEventListener("submit", teamLogin);
+  el.teacherLoginForm.addEventListener("submit", teacherLogin);
+  el.createWorldForm.addEventListener("submit", createWorld);
+  el.refreshWorldButton.addEventListener("click", refreshWorld);
   el.renameFief.addEventListener("click", renameFief);
   el.difficultySelect.addEventListener("change", changeDifficulty);
   el.tutorialButton.addEventListener("click", openTutorial);
@@ -1394,5 +1878,12 @@ function bindEvents() {
   document.addEventListener("focusout", hideTooltip);
 }
 
+async function initializeClassroom() {
+  await detectServer();
+  await restoreTeamSession();
+}
+
+loadLocalPractice();
 bindEvents();
 render();
+initializeClassroom();

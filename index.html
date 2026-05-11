@@ -34,6 +34,56 @@
     </header>
 
     <main>
+      <section class="classroom-console" aria-label="Multiplayer classroom controls">
+        <article class="panel classroom-login">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Multiplayer classroom</p>
+              <h2>Worlds and Team Codes</h2>
+            </div>
+            <div class="pill" id="sessionMode">Solo Practice</div>
+          </div>
+          <p id="sessionStatus" class="narrative">
+            Run `node server.js` for shared worlds and persistent saves. Students
+            use generated team codes, so no student accounts or emails are needed.
+          </p>
+          <div class="login-grid">
+            <form id="teamLoginForm" class="login-card">
+              <h3>Student team login</h3>
+              <label for="teamCodeInput">Team code</label>
+              <input id="teamCodeInput" autocomplete="off" placeholder="CROWN-1A2B" />
+              <button type="submit">Enter World</button>
+            </form>
+
+            <form id="teacherLoginForm" class="login-card">
+              <h3>Teacher login</h3>
+              <label for="teacherUsername">Username</label>
+              <input id="teacherUsername" autocomplete="username" value="teacher" />
+              <label for="teacherPassword">Password</label>
+              <input id="teacherPassword" autocomplete="current-password" type="password" />
+              <button type="submit">Open Teacher Tools</button>
+            </form>
+
+            <form id="createWorldForm" class="login-card teacher-tools" hidden>
+              <h3>Create a world</h3>
+              <label for="worldNameInput">World name</label>
+              <input id="worldNameInput" maxlength="48" value="Period 3 Marches" />
+              <label for="worldDifficultySelect">World difficulty</label>
+              <select id="worldDifficultySelect">
+                <option value="apprentice">Apprentice Steward</option>
+                <option value="balanced" selected>Balanced Manor</option>
+                <option value="hard">Hard Winter</option>
+                <option value="expert">Iron Crown</option>
+              </select>
+              <label for="teamCountInput">Teams</label>
+              <input id="teamCountInput" min="1" max="12" type="number" value="4" />
+              <button type="submit">Generate Team Codes</button>
+            </form>
+          </div>
+          <div id="teacherWorldList" class="world-list teacher-tools" hidden></div>
+        </article>
+      </section>
+
       <section class="status-grid" aria-label="Village status">
         <article class="metric">
           <span class="tooltip" data-term="Population" tabindex="0">Population</span>
@@ -92,6 +142,30 @@
           </div>
           <p id="villageNarrative" class="narrative"></p>
           <div class="resource-list" id="resourceList"></div>
+        </article>
+
+        <article class="panel map-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Local map</p>
+              <h2>Your Fief</h2>
+            </div>
+            <span class="tooltip help" data-term="Fief" tabindex="0">?</span>
+          </div>
+          <div id="fiefMap" class="fief-map" aria-label="Map of the player's fief"></div>
+          <p id="fiefMapCaption" class="history-note"></p>
+        </article>
+
+        <article class="panel map-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">World map</p>
+              <h2>Neighboring Fiefs</h2>
+            </div>
+            <button id="refreshWorldButton" class="secondary" type="button">Refresh</button>
+          </div>
+          <div id="worldMap" class="world-map" aria-label="Map of all player fiefs"></div>
+          <div id="worldMapLegend" class="world-legend"></div>
         </article>
 
         <article class="panel">

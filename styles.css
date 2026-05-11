@@ -118,6 +118,57 @@ main {
   border-radius: 1.25rem;
 }
 
+.classroom-console {
+  margin-bottom: 1rem;
+}
+
+.classroom-login {
+  grid-column: auto;
+}
+
+.login-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.login-card,
+.world-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem;
+  background: rgba(255, 248, 232, 0.66);
+  border: 1px solid rgba(139, 98, 56, 0.28);
+  border-radius: 1rem;
+}
+
+.login-card h3,
+.world-card h3 {
+  margin: 0;
+}
+
+.world-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.code-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.5rem;
+}
+
+.team-code {
+  padding: 0.5rem;
+  color: var(--ink);
+  background: var(--paper-strong);
+  border: 1px dashed var(--line-dark);
+  border-radius: 0.75rem;
+  font-family: "Courier New", monospace;
+  font-weight: 700;
+}
+
 .name-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -179,7 +230,8 @@ main {
 .village-panel,
 .event-panel,
 .tournament-panel,
-.log-panel {
+.log-panel,
+.map-panel {
   grid-column: span 6;
 }
 
@@ -265,7 +317,8 @@ main {
 .glossary-list div,
 .lord-card,
 .neighbor-card,
-.question-card {
+.question-card,
+.world-legend div {
   padding: 0.72rem;
   background: rgba(255, 248, 232, 0.64);
   border: 1px solid rgba(139, 98, 56, 0.24);
@@ -312,6 +365,83 @@ main {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
   gap: 0.6rem;
+}
+
+.fief-map,
+.world-map {
+  position: relative;
+  min-height: 21rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(53, 107, 66, 0.32), transparent 10rem),
+    radial-gradient(circle at 78% 70%, rgba(53, 92, 125, 0.22), transparent 9rem),
+    linear-gradient(135deg, #d9c68e, #a9bf83 48%, #d6b577);
+  border: 2px solid var(--line-dark);
+  border-radius: 1rem;
+}
+
+.fief-map {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 0.35rem;
+  padding: 0.6rem;
+}
+
+.map-tile {
+  display: grid;
+  place-items: center;
+  min-height: 3rem;
+  padding: 0.35rem;
+  text-align: center;
+  background: rgba(255, 248, 232, 0.6);
+  border: 1px solid rgba(95, 31, 25, 0.24);
+  border-radius: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.map-tile.strong {
+  color: #fff8e8;
+  background: rgba(95, 31, 25, 0.82);
+}
+
+.map-tile.good {
+  background: rgba(246, 219, 154, 0.88);
+}
+
+.map-marker {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  color: #fff8e8;
+  border: 2px solid rgba(255, 248, 232, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(43, 33, 24, 0.28);
+  font-size: 0.78rem;
+  font-weight: 700;
+  transform: translate(-50%, -50%);
+}
+
+.map-marker.current {
+  outline: 4px solid rgba(199, 138, 40, 0.48);
+}
+
+.world-road {
+  position: absolute;
+  height: 0.25rem;
+  background: rgba(95, 31, 25, 0.22);
+  border-radius: 999px;
+  transform-origin: left center;
+}
+
+.world-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.75rem;
 }
 
 .secondary {
@@ -407,7 +537,7 @@ main {
 
 .tutorial-progress {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(1.5rem, 1fr));
   gap: 0.35rem;
   margin: 1rem 0;
 }
@@ -432,8 +562,13 @@ main {
   .event-panel,
   .tournament-panel,
   .glossary-panel,
-  .log-panel {
+  .log-panel,
+  .map-panel {
     grid-column: span 6;
+  }
+
+  .login-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -452,7 +587,8 @@ main {
   .event-panel,
   .tournament-panel,
   .glossary-panel,
-  .log-panel {
+  .log-panel,
+  .map-panel {
     grid-column: auto;
   }
 
